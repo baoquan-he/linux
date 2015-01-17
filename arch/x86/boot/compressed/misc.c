@@ -239,12 +239,17 @@ static void handle_relocations(void *output, unsigned long output_len,
 	unsigned long delta, map, ptr;
 	unsigned long min_addr = (unsigned long)output;
 	unsigned long max_addr = min_addr + output_len;
+	char buf[128];
 
 	/*
 	 * Calculate the delta between where vmlinux was linked to load
 	 * and where it was actually loaded.
 	 */
 	delta = min_addr - LOAD_PHYSICAL_ADDR;
+	sprintf(buf, "handle_relocations phys_delta=0x%lx, virt_delta=0x%lx\n",
+			 delta,
+			 (unsigned long)virt_rand_offset - LOAD_PHYSICAL_ADDR);
+	debug_putstr(buf);
 
 	/*
 	 * The kernel contains a table of relocation addresses. Those
@@ -389,6 +394,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 
 	setup_idt();
 	real_mode = rmode;
+	char buf[128];
 
 	sanitize_boot_params(real_mode);
 
@@ -440,6 +446,12 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	debug_putstr("\nDecompressing Linux... ");
 	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
 	parse_elf(output);
+
+	sprintf(buf, "before handle_relocations output=0x%lx, virt_rand_offset=0x%lx\n",
+			(unsigned long) output,
+			(unsigned long) virt_rand_offset);
+	debug_putstr(buf);
+
 	handle_relocations(output, output_len, virt_rand_offset);
 	debug_putstr("done.\nBooting the kernel.\n");
 	return output;

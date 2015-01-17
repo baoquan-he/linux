@@ -325,6 +325,7 @@ void choose_kernel_location(unsigned char *input,
 			    unsigned char **virt_rand_offset)
 {
 	unsigned long random;
+	char buf[128];
 
 #ifdef CONFIG_HIBERNATION
 	if (!cmdline_find_option_bool("kaslr")) {
@@ -344,14 +345,17 @@ void choose_kernel_location(unsigned char *input,
 
 	/* Walk e820 and find a random address. */
 	random = find_random_addr((unsigned long)*output, output_size);
+	sprintf(buf, "choose_kernel_location phys_random=0x%lx\n", random);
+	debug_putstr(buf);
 	if (!random)
 		debug_putstr("KASLR could not find suitable E820 region...\n");
 	/* Always enforce the minimum. */
 	else if (random > (unsigned long)*output)
 		*output = (unsigned char*)random;
 
-
 	random = find_random_virt_offset(output_size);
+	sprintf(buf, "choose_kernel_location virt_random=0x%lx\n", random);
+	debug_putstr(buf);
 	if (!random)
 		debug_putstr("KASLR could not find suitable kernel mapping region...\n");
 	else if (random > LOAD_PHYSICAL_ADDR)
