@@ -231,7 +231,8 @@ static void error(char *x)
 }
 
 #if CONFIG_X86_NEED_RELOCS
-static void handle_relocations(void *output, unsigned long output_len)
+static void handle_relocations(void *output, unsigned long output_len,
+				unsigned char *virt_rand_offset)
 {
 	int *reloc;
 	unsigned long delta, map, ptr;
@@ -243,11 +244,6 @@ static void handle_relocations(void *output, unsigned long output_len)
 	 * and where it was actually loaded.
 	 */
 	delta = min_addr - LOAD_PHYSICAL_ADDR;
-	if (!delta) {
-		debug_putstr("No relocation needed... ");
-		return;
-	}
-	debug_putstr("Performing relocations... ");
 
 	/*
 	 * The kernel contains a table of relocation addresses. Those
@@ -257,6 +253,19 @@ static void handle_relocations(void *output, unsigned long output_len)
 	 * This will involve subtracting out the base address of the kernel.
 	 */
 	map = delta - __START_KERNEL_map;
+
+	/*
+	 * For x86_64 calculate the delta between where kernel was linked
+	 * and where it was finally mapped.
+	 */
+	if (IS_ENABLED(CONFIG_X86_64))
+		delta = (unsigned long)virt_rand_offset - LOAD_PHYSICAL_ADDR;
+
+	if (!delta) {
+		debug_putstr("No relocation needed... ");
+		return;
+	}
+	debug_putstr("Performing relocations... ");
 
 	/*
 	 * Process relocations: 32 bit relocations first then 64 bit after.
@@ -311,7 +320,8 @@ static void handle_relocations(void *output, unsigned long output_len)
 #endif
 }
 #else
-static inline void handle_relocations(void *output, unsigned long output_len)
+static inline void handle_relocations(void *output, unsigned long output_len,
+					unsigned char *virt_rand_offset)
 { }
 #endif
 
@@ -423,7 +433,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	debug_putstr("\nDecompressing Linux... ");
 	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
 	parse_elf(output);
-	handle_relocations(output, output_len);
+	handle_relocations(output, output_len, virt_rand_offset);
 	debug_putstr("done.\nBooting the kernel.\n");
 	return output;
 }
