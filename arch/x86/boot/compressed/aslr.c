@@ -1,4 +1,5 @@
 #include "misc.h"
+#include "../string.h"
 
 #include <asm/msr.h>
 #include <asm/archrandom.h>
@@ -290,6 +291,27 @@ static unsigned long find_random_addr(unsigned long minimum,
 	/* Verify potential e820 positions, appending to slots list. */
 	for (i = 0; i < real_mode->e820_entries; i++) {
 		process_e820_entry(&real_mode->e820_map[i], minimum, size);
+	}
+
+	return slots_fetch_random();
+}
+
+static unsigned long find_random_virt_offset(unsigned long size)
+{
+	struct mem_vector region, img;
+
+	memset(slots, 0, sizeof(slots));
+	slot_max = 0;
+
+	region.start = LOAD_PHYSICAL_ADDR;
+	region.size = CONFIG_RANDOMIZE_BASE_MAX_OFFSET - region.start;
+
+	for (img.start = region.start, img.size = size;
+	     mem_contains(&region, &img);
+	     img.start += CONFIG_PHYSICAL_ALIGN) {
+		if (mem_avoid_overlap(&img))
+			continue;
+		slots_append(img.start);
 	}
 
 	return slots_fetch_random();
