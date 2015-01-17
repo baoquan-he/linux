@@ -317,12 +317,12 @@ static unsigned long find_random_virt_offset(unsigned long size)
 	return slots_fetch_random();
 }
 
-unsigned char *choose_kernel_location(unsigned char *input,
-				      unsigned long input_size,
-				      unsigned char *output,
-				      unsigned long output_size)
+void choose_kernel_location(unsigned char *input,
+			    unsigned long input_size,
+			    unsigned char **output,
+			    unsigned long output_size,
+			    unsigned char **virt_rand_offset)
 {
-	unsigned long choice = (unsigned long)output;
 	unsigned long random;
 
 #ifdef CONFIG_HIBERNATION
@@ -342,17 +342,21 @@ unsigned char *choose_kernel_location(unsigned char *input,
 		       output_size);
 
 	/* Walk e820 and find a random address. */
-	random = find_random_addr(choice, output_size);
-	if (!random) {
+	random = find_random_addr((unsigned long)*output, output_size);
+	if (!random)
 		debug_putstr("KASLR could not find suitable E820 region...\n");
-		goto out;
-	}
-
 	/* Always enforce the minimum. */
-	if (random < choice)
-		goto out;
+	else if (random > (unsigned long)*output)
+		*output = (unsigned char*)random;
 
-	choice = random;
+
+	random = find_random_virt_offset(output_size);
+	if (!random)
+		debug_putstr("KASLR could not find suitable kernel mapping region...\n");
+	else if (random > LOAD_PHYSICAL_ADDR)
+		*virt_rand_offset = (unsigned char*)random;
+
 out:
-	return (unsigned char *)choice;
+	if (!random)
+		*virt_rand_offset = (unsigned char*)LOAD_PHYSICAL_ADDR;
 }

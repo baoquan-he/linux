@@ -373,6 +373,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 				  unsigned long output_len,
 				  unsigned long run_size)
 {
+	unsigned char *virt_rand_offset;
 	real_mode = rmode;
 
 	sanitize_boot_params(real_mode);
@@ -399,9 +400,10 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	 * the entire decompressed kernel plus relocation table, or the
 	 * entire decompressed kernel plus .bss and .brk sections.
 	 */
-	output = choose_kernel_location(input_data, input_len, output,
+	choose_kernel_location(input_data, input_len, &output,
 					output_len > run_size ? output_len
-							      : run_size);
+							      : run_size,
+					&virt_rand_offset);
 
 	/* Validate memory location choices. */
 	if ((unsigned long)output & (MIN_KERNEL_ALIGN - 1))
