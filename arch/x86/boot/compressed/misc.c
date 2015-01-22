@@ -11,6 +11,7 @@
 
 #include "misc.h"
 #include "../string.h"
+#include <asm/pgtable_types.h>
 
 /* WARNING!!
  * This code is compiled with -fPIC and it is relocated dynamically
@@ -119,6 +120,9 @@ memptr free_mem_end_ptr;
 static char *vidmem;
 static int vidport;
 static int lines, cols;
+
+memptr ident_pgt_ptr;
+unsigned int next_ident_pgt=0;
 
 #ifdef CONFIG_KERNEL_GZIP
 #include "../../../../lib/decompress_inflate.c"
@@ -378,7 +382,8 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 				  unsigned long input_len,
 				  unsigned char *output,
 				  unsigned long output_len,
-				  unsigned long run_size)
+				  unsigned long run_size,
+				  memptr ident_pgt)
 {
 	unsigned char *virt_rand_offset;
 
@@ -400,6 +405,9 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 
 	console_init();
 	debug_putstr("early console in decompress_kernel\n");
+
+	ident_pgt_ptr = ident_pgt;
+	ident_pgt_ptr = (pte_t*)ident_pgt+ 6*PTRS_PER_PTE;
 
 	free_mem_ptr     = heap;	/* Heap */
 	free_mem_end_ptr = heap + BOOT_HEAP_SIZE;

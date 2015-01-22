@@ -9,6 +9,7 @@
 
 #ifdef USE_BOOT_IDT
 
+#include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/traps.h>
 #include <asm/uaccess.h>
@@ -56,14 +57,56 @@ static asmlinkage void do_boot_page_fault(void)
 {
 	/* Not recoverable, so no asm wrapper needed. */
 	unsigned long addr;
+	unsigned long i;
+	pte_t *pte = (pte_t*)ident_pgt_ptr;
+        pgdval_t pgd, *pgd_p;
+        pudval_t pud, *pud_p;
+        pmdval_t pmd, *pmd_p;
+	pmdval_t early_pmd_flags = __PAGE_KERNEL_LARGE & ~(_PAGE_GLOBAL | _PAGE_NX);
 
 	asm ("mov %%cr2,%0" : "=rm" (addr));
 	error_putstr("\n\nPage fault accessing 0x");
 	error_puthex(addr);
-	error_putstr("\n\n -- System halted");
+	//error_putstr("\n\n -- System halted");
 
-	while(1)
-		asm("hlt");
+	pgd_p = &pte[pgd_index(addr)].pte;
+	pgd = *pgd_p;
+
+	if (pgd)
+		pud_p = (pudval_t *)(pgd & PTE_PFN_MASK);
+	else {
+		if (next_ident_pgt >= 4) {
+			error_putstr("\n\n -- System halted");
+			while(1)
+				asm("hlt");
+                }
+
+                pud_p = (pudval_t *) (pte+(next_ident_pgt+6)*PTRS_PER_PTE);
+		next_ident_pgt++;
+                for (i = 0; i < PTRS_PER_PUD; i++)
+                        pud_p[i] = 0;
+                *pgd_p = (pgdval_t)pud_p + 7;
+	}
+	pud_p += pud_index(addr);
+        pud = *pud_p;
+
+        if (pud)
+                pmd_p = (pmdval_t *)(pud & PTE_PFN_MASK);
+        else {
+                if (next_ident_pgt >= 4) {
+			error_putstr("\n\n -- System halted");
+			while(1)
+				asm("hlt");
+                }
+
+                pmd_p = (pmdval_t *) (pte+(next_ident_pgt+6)*PTRS_PER_PTE);
+		next_ident_pgt++;
+                for (i = 0; i < PTRS_PER_PMD; i++)
+                        pmd_p[i] = 0;
+                *pud_p = (pudval_t)pmd_p + 7;
+        }
+        pmd = (addr & PMD_MASK) + early_pmd_flags;
+        pmd_p[pmd_index(addr)] = pmd;
 }
 
 void setup_idt(void)
@@ -96,4 +139,4 @@ void setup_idt(void)
 	asm volatile ("lidt %0" : : "m" (gp_idt_descr));
 }
 
-#endif /* CONFIG_X86_VERBOSE_BOOTUP || CONFIG_RANDOMIZE_BASE */
+#endif /* USE_BOOT_IDT */

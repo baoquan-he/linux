@@ -124,7 +124,7 @@ ENTRY(startup_32)
 	/* Initialize Page tables to 0 */
 	leal	pgtable(%ebx), %edi
 	xorl	%eax, %eax
-	movl	$((4096*6)/4), %ecx
+	movl	$((4096*10)/4), %ecx
 	rep	stosl
 
 	/* Build Level 4 */
@@ -403,6 +403,8 @@ relocated:
  * Do the decompression, and jump to the new kernel..
  */
 	pushq	%rsi			/* Save the real mode argument */
+	leaq	pgtable(%rip), %r9
+	pushq	%r9
 	movq	$z_run_size, %r9	/* size of kernel with .bss and .brk */
 	pushq	%r9
 	movq	%rsi, %rdi		/* real mode address */
@@ -510,4 +512,4 @@ boot_stack_end:
 	.section ".pgtable","a",@nobits
 	.balign 4096
 pgtable:
-	.fill 6*4096, 1, 0
+	.fill 10*4096, 1, 0

@@ -32,6 +32,8 @@
 extern memptr free_mem_ptr;
 extern memptr free_mem_end_ptr;
 extern struct boot_params *real_mode;		/* Pointer to real-mode data */
+extern memptr ident_pgt_ptr;
+extern unsigned int next_ident_pgt;
 void __putstr(const char *s);
 #define error_putstr(__x)  __putstr(__x)
 extern void error(char *x);
