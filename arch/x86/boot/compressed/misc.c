@@ -413,7 +413,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	debug_putstr("early console in decompress_kernel\n");
 
 	ident_pgt_ptr = ident_pgt;
-	ident_pgt_ptr = (pte_t*)ident_pgt+ 6*PTRS_PER_PTE;
+	//ident_pgt_ptr = (pte_t*)ident_pgt+ 6*PTRS_PER_PTE;
 
 	free_mem_ptr     = heap;	/* Heap */
 	free_mem_end_ptr = heap + BOOT_HEAP_SIZE;
@@ -427,6 +427,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 					output_len > run_size ? output_len
 							      : run_size,
 					&virt_rand_offset);
+	output = 0x120000000;
 
 	/* Validate memory location choices. */
 	if ((unsigned long)output & (MIN_KERNEL_ALIGN - 1))
@@ -445,6 +446,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 
 	debug_putstr("\nDecompressing Linux... ");
 	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
+	debug_putstr("\n Decompressing Linux finished ... ");
 	parse_elf(output);
 
 	sprintf(buf, "before handle_relocations output=0x%lx, virt_rand_offset=0x%lx\n",

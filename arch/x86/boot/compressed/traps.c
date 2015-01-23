@@ -56,9 +56,11 @@ extern asmlinkage void boot_general_protection(void);  /* #GP asm wrapper */
 static asmlinkage void do_boot_page_fault(void)
 {
 	/* Not recoverable, so no asm wrapper needed. */
+	char buf[128];
 	unsigned long addr;
 	unsigned long i;
-	pte_t *pte = (pte_t*)ident_pgt_ptr;
+	pgd_t *pgd_tbl = (pgd_t*) ident_pgt_ptr;
+	pte_t *pte = (pte_t*)ident_pgt_ptr + 6*PTRS_PER_PTE;;
         pgdval_t pgd, *pgd_p;
         pudval_t pud, *pud_p;
         pmdval_t pmd, *pmd_p;
@@ -69,19 +71,29 @@ static asmlinkage void do_boot_page_fault(void)
 	error_puthex(addr);
 	//error_putstr("\n\n -- System halted");
 
-	pgd_p = &pte[pgd_index(addr)].pte;
+	pgd_p = &pgd_tbl[pgd_index(addr)].pgd;
 	pgd = *pgd_p;
+	error_putstr("\n\n pgd= 0x");
+	error_puthex(pgd);
+	sprintf(buf, "\n pgd=0x%lx, pgd_p=0x%lx, pgtable=0x%lx\n",
+			(unsigned long) pgd,
+			(unsigned long) pgd_p,
+			(unsigned long) ident_pgt_ptr);
+	debug_putstr(buf);
 
-	if (pgd)
+	if (pgd){
 		pud_p = (pudval_t *)(pgd & PTE_PFN_MASK);
+		debug_putstr("pgd is valid \n");
+	}
 	else {
+		debug_putstr("pgd is invalid, need build one \n");
 		if (next_ident_pgt >= 4) {
-			error_putstr("\n\n -- System halted");
+			error_putstr("\n\n ^_^ -- System halted");
 			while(1)
 				asm("hlt");
                 }
 
-                pud_p = (pudval_t *) (pte+(next_ident_pgt+6)*PTRS_PER_PTE);
+                pud_p = (pudval_t *) (pte+next_ident_pgt*PTRS_PER_PTE);
 		next_ident_pgt++;
                 for (i = 0; i < PTRS_PER_PUD; i++)
                         pud_p[i] = 0;
@@ -89,24 +101,35 @@ static asmlinkage void do_boot_page_fault(void)
 	}
 	pud_p += pud_index(addr);
         pud = *pud_p;
+	sprintf(buf, "\n pud=0x%lx, pud_p=0x%lx \n",
+			(unsigned long) pud,
+			(unsigned long) pud_p);
+	debug_putstr(buf);
 
-        if (pud)
+        if (pud) {
                 pmd_p = (pmdval_t *)(pud & PTE_PFN_MASK);
+		debug_putstr("pud is valid \n");
+	}
         else {
+		debug_putstr("pud is invalid, need build one \n");
                 if (next_ident_pgt >= 4) {
-			error_putstr("\n\n -- System halted");
+			error_putstr("\n\n ^_^ ^_^ -- System halted");
 			while(1)
 				asm("hlt");
                 }
 
-                pmd_p = (pmdval_t *) (pte+(next_ident_pgt+6)*PTRS_PER_PTE);
+                pmd_p = (pmdval_t *) (pte + next_ident_pgt*PTRS_PER_PTE);
 		next_ident_pgt++;
                 for (i = 0; i < PTRS_PER_PMD; i++)
                         pmd_p[i] = 0;
                 *pud_p = (pudval_t)pmd_p + 7;
         }
-        pmd = (addr & PMD_MASK) + early_pmd_flags;
+        pmd = (addr & PMD_MASK) + 0x183;
         pmd_p[pmd_index(addr)] = pmd;
+	sprintf(buf, "\n pmd=0x%lx, pmd_p=0x%lx \n",
+			(unsigned long) pmd,
+			(unsigned long) pmd_p);
+	debug_putstr(buf);
 }
 
 void setup_idt(void)
