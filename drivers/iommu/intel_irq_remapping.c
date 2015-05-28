@@ -790,8 +790,10 @@ static int ir_parse_one_ioapic_scope(struct acpi_dmar_device_scope *scope,
 		if (ir_ioapic[count].iommu == iommu &&
 		    ir_ioapic[count].id == scope->enumeration_id)
 			return 0;
-		else if (ir_ioapic[count].iommu == NULL && free == -1)
+		else if (ir_ioapic[count].iommu == NULL && free == -1) {
 			free = count;
+			break;
+		}
 	}
 	if (free == -1) {
 		pr_warn("Exceeded Max IO APICS\n");
