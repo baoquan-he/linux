@@ -412,14 +412,32 @@ static inline int ivhd_entry_length(u8 *ivhd)
  * This function reads the last device id the IOMMU has to handle from the PCI
  * capability header for this IOMMU
  */
-static int __init find_last_devid_on_pci(int bus, int dev, int fn, int cap_ptr)
+static int __init find_first_devid_on_pci(struct ivhd_header *h)
 {
 	u32 cap;
 
-	cap = read_pci_config(bus, dev, fn, cap_ptr+MMIO_RANGE_OFFSET);
-	update_last_devid(PCI_DEVID(MMIO_GET_BUS(cap), MMIO_GET_LD(cap)));
+	cap = read_pci_config(PCI_BUS_NUM(h->devid),
+				PCI_SLOT(h->devid),
+				PCI_FUNC(h->devid),
+				h->cap_ptr+MMIO_RANGE_OFFSET);
 
-	return 0;
+	return PCI_DEVID(MMIO_GET_BUS(range), MMIO_GET_FD(range));
+}
+
+/*
+ * This function reads the last device id the IOMMU has to handle from the PCI
+ * capability header for this IOMMU
+ */
+static int __init find_last_devid_on_pci(struct ivhd_header *h)
+{
+	u32 cap;
+
+	cap = read_pci_config(PCI_BUS_NUM(h->devid),
+				PCI_SLOT(h->devid),
+				PCI_FUNC(h->devid),
+				h->cap_ptr+MMIO_RANGE_OFFSET);
+
+	return PCI_DEVID(MMIO_GET_BUS(range), MMIO_GET_LD(range));
 }
 
 /*
@@ -430,14 +448,13 @@ static int __init find_last_devid_from_ivhd(struct ivhd_header *h)
 {
 	u8 *p = (void *)h, *end = (void *)h;
 	struct ivhd_entry *dev;
+	u16 devid;
+
+	devid = find_last_devid_on_pci(h);
+	update_last_devid(devid);
 
 	p += sizeof(*h);
 	end += h->length;
-
-	find_last_devid_on_pci(PCI_BUS_NUM(h->devid),
-			PCI_SLOT(h->devid),
-			PCI_FUNC(h->devid),
-			h->cap_ptr);
 
 	while (p < end) {
 		dev = (struct ivhd_entry *)p;
@@ -1098,6 +1115,9 @@ static int __init init_iommu_one(struct amd_iommu *iommu, struct ivhd_header *h)
 	iommu->pci_seg = h->pci_seg;
 	iommu->mmio_phys = h->mmio_phys;
 
+	iommu->first_device = find_first_devid_on_pci(h);
+	iommu->last_device = find_last_devid_on_pci(h);
+
 	/* Check if IVHD EFR contains proper max banks/counters */
 	if ((h->efr != 0) &&
 	    ((h->efr & (0xF << 13)) != 0) &&
@@ -1259,15 +1279,8 @@ static int iommu_init_pci(struct amd_iommu *iommu)
 
 	pci_read_config_dword(iommu->dev, cap_ptr + MMIO_CAP_HDR_OFFSET,
 			      &iommu->cap);
-	pci_read_config_dword(iommu->dev, cap_ptr + MMIO_RANGE_OFFSET,
-			      &range);
 	pci_read_config_dword(iommu->dev, cap_ptr + MMIO_MISC_OFFSET,
 			      &misc);
-
-	iommu->first_device = PCI_DEVID(MMIO_GET_BUS(range),
-					 MMIO_GET_FD(range));
-	iommu->last_device = PCI_DEVID(MMIO_GET_BUS(range),
-					MMIO_GET_LD(range));
 
 	if (!(iommu->cap & (1 << IOMMU_CAP_IOTLB)))
 		amd_iommu_iotlb_sup = false;
