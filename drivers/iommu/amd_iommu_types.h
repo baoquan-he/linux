@@ -463,6 +463,9 @@ struct dma_ops_domain {
 	bool need_flush;
 };
 
+#define IOMMU_FLAG_TRANS_PRE_ENABLED     (1 << 0)
+#define IOMMU_FLAG_IRQ_REMAP_PRE_ENABLED (1 << 1)
+
 /*
  * Structure where we save information about one hardware AMD IOMMU in the
  * system.
@@ -573,6 +576,7 @@ struct amd_iommu {
 	struct irq_domain *ir_domain;
 	struct irq_domain *msi_domain;
 #endif
+	u32	flags;
 };
 
 struct devid_map {

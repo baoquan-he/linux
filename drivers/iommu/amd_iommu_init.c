@@ -225,6 +225,27 @@ static bool __initdata cmdline_maps;
 
 static enum iommu_init_state init_state = IOMMU_START_STATE;
 
+static u8 g_pre_enabled;
+
+static bool translation_pre_enabled(struct amd_iommu *iommu)
+{
+        return (iommu->flags & IOMMU_FLAG_TRANS_PRE_ENABLED);
+}
+
+static void clear_translation_pre_enabled(struct amd_iommu *iommu)
+{
+        iommu->flags &= ~IOMMU_FLAG_TRANS_PRE_ENABLED;
+}
+
+static void init_translation_status(struct amd_iommu *iommu)
+{
+	u32 ctrl;
+
+	ctrl = readl(iommu->mmio_base + MMIO_CONTROL_OFFSET);
+	if (ctrl & CONTROL_IOMMU_EN)
+		iommu->flags |= IOMMU_FLAG_TRANS_PRE_ENABLED;
+}
+
 static int amd_iommu_enable_interrupts(void);
 static int __init iommu_go_to_state(enum iommu_init_state state);
 static void init_device_table_dma(void);
@@ -1141,6 +1162,8 @@ static int __init init_iommu_one(struct amd_iommu *iommu, struct ivhd_header *h)
 		return -ENOMEM;
 
 	iommu->int_enabled = false;
+
+	init_translation_status(iommu);
 
 	ret = init_iommu_from_acpi(iommu, h);
 	if (ret)
