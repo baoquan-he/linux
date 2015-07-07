@@ -109,7 +109,7 @@ struct mem_vector {
 	unsigned long size;
 };
 
-#define MEM_AVOID_MAX 5
+#define MEM_AVOID_MAX 4
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
 
 static bool mem_contains(struct mem_vector *region, struct mem_vector *item)
@@ -134,22 +134,66 @@ static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 	return true;
 }
 
+/*
+ * In theroy, kaslr can put kernel anywhere in area of [16M, 64T). Array mem_avoid
+ * is used to store those ranges which need be avoided when kaslr searches new
+ * output address. We need avoid the region that is unsafe to overlap during
+ * decompression, initrd, cmdline and boot_params.
+ *
+ * How to get the region that is unsafe to overlap during decompression need
+ * be discussed detailedly. The principal is the compressed vmlinux plus relocs
+ * and the run space of ZO can't be overriden by decompressing output.
+ *
+ * Now ZO sit end of the buffer always, we can find out where is text and
+ * data/bss etc of ZO.
+ *
+ * Based on the following facts:
+ *  - init_size >= run_size,
+ *  - input+input_len >= output+output_len,
+ *  - run_size coule be >= or  <  output_len
+ *
+ * we can make several assumptions for better presentation by diagram:
+ *  - init_size > run_size
+ *  - input+input_len > output+output_len
+ *  - run_size > output_len
+ *
+ * 0   output                       input             input+input_len          output+init_size
+ * |     |                            |                       |                       |
+ * |-----|-------------------|--------|------------------|----|------------|----------|
+ *                           |                           |                 |
+ *              output+init_size-ZO_INIT_SIZE    output+output_len    output+run_size
+ *
+ * [output, output+init_size) is the for decompressing buffer for compressed
+ * kernel.
+ *
+ * [output, output+run_size) is for VO run size.
+ * [output, output+output_len) is (VO (vmlinux after objcopy) plus relocs)
+ *
+ * [output+init_size-ZO_INIT_SIZE, output+init_size) is copied ZO.
+ * [input, input+input_len) is copied compressed (VO (vmlinux after objcopy)
+ * plus relocs), not the ZO.
+ *
+ * [input+input_len, output+init_size) is [_text, _end) for ZO. That could be
+ * first range in mem_avoid. Now the first range already includes heap and
+ * stack for ZO running. Also [input, input+input_size) need be put in mem_avoid
+ * array. It is adjacent to the first entry, so merge them. This is  how we get
+ * the first entry in mem_avoid[].
+ *
+ */
 static void mem_avoid_init(unsigned long input, unsigned long input_size,
-			   unsigned long output, unsigned long output_size)
+			   unsigned long output)
 {
+	unsigned long init_size = real_mode->hdr.init_size;
 	u64 initrd_start, initrd_size;
 	u64 cmd_line, cmd_line_size;
-	unsigned long unsafe, unsafe_len;
 	char *ptr;
 
 	/*
 	 * Avoid the region that is unsafe to overlap during
-	 * decompression (see calculations at top of misc.c).
+	 * decompression.
 	 */
-	unsafe_len = (output_size >> 12) + 32768 + 18;
-	unsafe = (unsigned long)input + input_size - unsafe_len;
-	mem_avoid[0].start = unsafe;
-	mem_avoid[0].size = unsafe_len;
+	mem_avoid[0].start = input;
+	mem_avoid[0].size = (output + init_size) - input;
 
 	/* Avoid initrd. */
 	initrd_start  = (u64)real_mode->ext_ramdisk_image << 32;
@@ -169,13 +213,9 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	mem_avoid[2].start = cmd_line;
 	mem_avoid[2].size = cmd_line_size;
 
-	/* Avoid heap memory. */
-	mem_avoid[3].start = (unsigned long)free_mem_ptr;
-	mem_avoid[3].size = BOOT_HEAP_SIZE;
-
-	/* Avoid stack memory. */
-	mem_avoid[4].start = (unsigned long)free_mem_end_ptr;
-	mem_avoid[4].size = BOOT_STACK_SIZE;
+	/* Avoid params */
+	mem_avoid[3].start = (unsigned long)real_mode;
+	mem_avoid[3].size = sizeof(*real_mode);
 }
 
 /* Does this memory vector overlap a known avoided area? */
@@ -319,7 +359,7 @@ unsigned char *choose_kernel_location(unsigned char *input,
 
 	/* Record the various known unsafe memory ranges. */
 	mem_avoid_init((unsigned long)input, input_size,
-		       (unsigned long)output, output_size);
+		       (unsigned long)output);
 
 	/* Walk e820 and find a random address. */
 	random = find_random_addr(choice, output_size);
