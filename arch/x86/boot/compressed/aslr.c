@@ -409,6 +409,27 @@ static unsigned long find_random_addr(unsigned long minimum,
 	return slots_fetch_random();
 }
 
+static unsigned long find_random_virt_offset(unsigned long minimum,
+				  unsigned long image_size)
+{
+	unsigned long slot_num, random;
+
+	/* Make sure minimum is aligned. */
+	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
+
+	if (image_size <= CONFIG_PHYSICAL_ALIGN)
+		slot_num = (CONFIG_RANDOMIZE_BASE_MAX_OFFSET - minimum) /
+				CONFIG_PHYSICAL_ALIGN;
+	else
+		slot_num = (CONFIG_RANDOMIZE_BASE_MAX_OFFSET -
+				minimum - image_size) /
+				CONFIG_PHYSICAL_ALIGN + 1;
+
+	random = get_random_long() % slot_num;
+
+	return random * CONFIG_PHYSICAL_ALIGN + minimum;
+}
+
 unsigned char *choose_kernel_location(unsigned char *input,
 				      unsigned long input_size,
 				      unsigned char *output,
