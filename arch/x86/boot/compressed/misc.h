@@ -84,6 +84,17 @@ unsigned char *choose_kernel_location(unsigned char *input,
 }
 #endif
 
+#ifdef CONFIG_X86_64
+void fill_pagetable(unsigned long start, unsigned long size);
+void switch_pagetable(void);
+extern unsigned char _pgtable[];
+#else
+static inline void fill_pagetable(unsigned long start, unsigned long size)
+{ }
+static inline void switch_pagetable(void)
+{ }
+#endif
+
 #ifdef CONFIG_EARLY_PRINTK
 /* early_serial_console.c */
 extern int early_serial_base;

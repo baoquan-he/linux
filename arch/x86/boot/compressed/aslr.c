@@ -151,6 +151,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	 */
 	mem_avoid[0].start = input;
 	mem_avoid[0].size = (output + init_size) - input;
+	fill_pagetable(input, (output + init_size) - input);
 
 	/* Avoid initrd. */
 	initrd_start  = (u64)real_mode->ext_ramdisk_image << 32;
@@ -159,6 +160,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	initrd_size |= real_mode->hdr.ramdisk_size;
 	mem_avoid[1].start = initrd_start;
 	mem_avoid[1].size = initrd_size;
+	/* don't need to set mapping for initrd */
 
 	/* Avoid kernel command line. */
 	cmd_line  = (u64)real_mode->ext_cmd_line_ptr << 32;
@@ -169,10 +171,19 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 		;
 	mem_avoid[2].start = cmd_line;
 	mem_avoid[2].size = cmd_line_size;
+	fill_pagetable(cmd_line, cmd_line_size);
 
 	/* Avoid params */
 	mem_avoid[3].start = (unsigned long)real_mode;
 	mem_avoid[3].size = sizeof(*real_mode);
+	fill_pagetable((unsigned long)real_mode, sizeof(*real_mode));
+
+	/* don't need to set mapping for setup_data */
+
+#ifdef CONFIG_X86_VERBOSE_BOOTUP
+	/* for video ram */
+	fill_pagetable(0, PMD_SIZE);
+#endif
 }
 
 /* Does this memory vector overlap a known avoided area? */
@@ -330,6 +341,9 @@ unsigned char *choose_kernel_location(unsigned char *input,
 		goto out;
 
 	choice = random;
+
+	fill_pagetable(choice, output_size);
+	switch_pagetable();
 out:
 	return (unsigned char *)choice;
 }

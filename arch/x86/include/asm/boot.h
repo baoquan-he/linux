@@ -32,7 +32,26 @@
 #endif /* !CONFIG_KERNEL_BZIP2 */
 
 #ifdef CONFIG_X86_64
+
 #define BOOT_STACK_SIZE	0x4000
+
+#define BOOT_INIT_PGT_SIZE (6*4096)
+#ifdef CONFIG_RANDOMIZE_BASE
+/*
+ * 1 page for level4, 2 pages for first 2M.
+ * (2+2)*4 pages for kernel, param, cmd_line, random kernel
+ * if all cross 512G boundary.
+ * So total will be 19 pages.
+ */
+#ifdef CONFIG_X86_VERBOSE_BOOTUP
+#define BOOT_PGT_SIZE (19*4096)
+#else
+#define BOOT_PGT_SIZE (17*4096)
+#endif
+#else
+#define BOOT_PGT_SIZE BOOT_INIT_PGT_SIZE
+#endif
+
 #else
 #define BOOT_STACK_SIZE	0x1000
 #endif
