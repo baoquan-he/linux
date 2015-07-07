@@ -259,7 +259,19 @@ static bool mem_avoid_overlap(struct mem_vector *img)
 
 static unsigned long slots[CONFIG_RANDOMIZE_BASE_MAX_OFFSET /
 			   CONFIG_PHYSICAL_ALIGN];
+
+struct slot_area {
+	unsigned long addr;
+	int num;
+};
+
+#define MAX_SLOT_AREA 100
+
+static struct slot_area slot_areas[MAX_SLOT_AREA];
+
 static unsigned long slot_max;
+
+static unsigned long slot_area_index;
 
 static void slots_append(unsigned long addr)
 {
