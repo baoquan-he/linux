@@ -114,9 +114,6 @@
 #undef memset
 #define memzero(s, n)	memset((s), 0, (n))
 
-
-static void error(char *m);
-
 /*
  * This is set up by the setup-routine at boot-time
  */
@@ -243,7 +240,7 @@ void __puthex(unsigned long value)
 	}
 }
 
-static void error(char *x)
+void error(char *x)
 {
 	error_putstr("\n\n");
 	error_putstr(x);
@@ -378,9 +375,7 @@ static void parse_elf(void *output)
 #else
 			dest = (void *)(phdr->p_paddr);
 #endif
-			memcpy(dest,
-			       output + phdr->p_offset,
-			       phdr->p_filesz);
+			memcpy(dest, output + phdr->p_offset, phdr->p_filesz);
 			break;
 		default: /* Ignore other PT_* */ break;
 		}
