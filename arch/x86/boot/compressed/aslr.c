@@ -257,6 +257,40 @@ static bool mem_avoid_overlap(struct mem_vector *img)
 	return false;
 }
 
+static unsigned long
+mem_min_overlap(struct mem_vector *img, struct mem_vector *out)
+{
+	int i;
+	struct setup_data *ptr;
+	unsigned long min = img->start + img->size;
+
+	for (i = 0; i < MEM_AVOID_MAX; i++) {
+		if (mem_overlaps(img, &mem_avoid[i]) &&
+			(mem_avoid[i].start < min)) {
+			*out = mem_avoid[i];
+			min = mem_avoid[i].start;
+		}
+	}
+
+	/* Check all entries in the setup_data linked list. */
+	ptr = (struct setup_data *)(unsigned long)real_mode->hdr.setup_data;
+	while (ptr) {
+		struct mem_vector avoid;
+
+		avoid.start = (unsigned long)ptr;
+		avoid.size = sizeof(*ptr) + ptr->len;
+
+		if (mem_overlaps(img, &avoid) && (avoid.start < min)) {
+			*out = avoid;
+			min = avoid.start;
+		}
+
+		ptr = (struct setup_data *)(unsigned long)ptr->next;
+	}
+
+	return min;
+}
+
 static unsigned long slots[CONFIG_RANDOMIZE_BASE_MAX_OFFSET /
 			   CONFIG_PHYSICAL_ALIGN];
 
@@ -272,6 +306,23 @@ static struct slot_area slot_areas[MAX_SLOT_AREA];
 static unsigned long slot_max;
 
 static unsigned long slot_area_index;
+
+static void store_slot_info(struct mem_vector *region, unsigned long image_size)
+{
+	struct slot_area slot_area;
+
+	slot_area.addr = region->start;
+	if (image_size <= CONFIG_PHYSICAL_ALIGN)
+		slot_area.num = region->size / CONFIG_PHYSICAL_ALIGN;
+	else
+		slot_area.num = (region->size - image_size) /
+				CONFIG_PHYSICAL_ALIGN + 1;
+
+	if (slot_area.num > 0) {
+		slot_areas[slot_area_index++] = slot_area;
+		slot_max += slot_area.num;
+	}
+}
 
 static void slots_append(unsigned long addr)
 {
