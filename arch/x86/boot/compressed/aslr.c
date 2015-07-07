@@ -446,7 +446,8 @@ void choose_kernel_location(unsigned char *input,
 				unsigned long output_size,
 				unsigned char **virt_offset)
 {
-	unsigned long random;
+	unsigned long random, min_addr;
+
 	*virt_offset = (unsigned char *)LOAD_PHYSICAL_ADDR;
 
 #ifdef CONFIG_HIBERNATION
@@ -467,8 +468,13 @@ void choose_kernel_location(unsigned char *input,
 	mem_avoid_init((unsigned long)input, input_size,
 		       (unsigned long)*output);
 
+	/* start from 512M */
+	min_addr = (unsigned long)*output;
+	if (min_addr > (512UL<<20))
+		min_addr = 512UL<<20;
+
 	/* Walk e820 and find a random address. */
-	random = find_random_phy_addr((unsigned long)*output, output_size);
+	random = find_random_phy_addr(min_addr, output_size);
 	if (!random)
 		debug_putstr("KASLR could not find suitable E820 region...\n");
 	else {
