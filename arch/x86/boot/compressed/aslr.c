@@ -112,17 +112,6 @@ struct mem_vector {
 #define MEM_AVOID_MAX 4
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
 
-static bool mem_contains(struct mem_vector *region, struct mem_vector *item)
-{
-	/* Item at least partially before region. */
-	if (item->start < region->start)
-		return false;
-	/* Item at least partially after region. */
-	if (item->start + item->size > region->start + region->size)
-		return false;
-	return true;
-}
-
 static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 {
 	/* Item one is entirely before item two. */
@@ -291,9 +280,6 @@ mem_min_overlap(struct mem_vector *img, struct mem_vector *out)
 	return min;
 }
 
-static unsigned long slots[CONFIG_RANDOMIZE_BASE_MAX_OFFSET /
-			   CONFIG_PHYSICAL_ALIGN];
-
 struct slot_area {
 	unsigned long addr;
 	int num;
@@ -322,16 +308,6 @@ static void store_slot_info(struct mem_vector *region, unsigned long image_size)
 		slot_areas[slot_area_index++] = slot_area;
 		slot_max += slot_area.num;
 	}
-}
-
-static void slots_append(unsigned long addr)
-{
-	/* Overflowing the slots list should be impossible. */
-	if (slot_max >= CONFIG_RANDOMIZE_BASE_MAX_OFFSET /
-			CONFIG_PHYSICAL_ALIGN)
-		return;
-
-	slots[slot_max++] = addr;
 }
 
 static unsigned long slots_fetch_random(void)
