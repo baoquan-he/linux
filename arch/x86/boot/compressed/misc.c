@@ -251,7 +251,8 @@ void error(char *x)
 }
 
 #if CONFIG_X86_NEED_RELOCS
-static void handle_relocations(void *output, unsigned long output_len)
+static void handle_relocations(void *output, unsigned long output_len,
+			       void *virt_offset)
 {
 	int *reloc;
 	unsigned long delta, map, ptr;
@@ -263,11 +264,6 @@ static void handle_relocations(void *output, unsigned long output_len)
 	 * and where it was actually loaded.
 	 */
 	delta = min_addr - LOAD_PHYSICAL_ADDR;
-	if (!delta) {
-		debug_putstr("No relocation needed... ");
-		return;
-	}
-	debug_putstr("Performing relocations... ");
 
 	/*
 	 * The kernel contains a table of relocation addresses. Those
@@ -277,6 +273,22 @@ static void handle_relocations(void *output, unsigned long output_len)
 	 * This will involve subtracting out the base address of the kernel.
 	 */
 	map = delta - __START_KERNEL_map;
+
+
+
+	/*
+	 * 32-bit always performs relocations. 64-bit relocations are only
+	 * needed if kASLR has chosen a different starting address offset
+	 * from __START_KERNEL_map.
+	 */
+	if (IS_ENABLED(CONFIG_X86_64))
+		delta = (unsigned long)virt_offset - LOAD_PHYSICAL_ADDR;
+
+	if (!delta) {
+		debug_putstr("No relocation needed... ");
+		return;
+	}
+	debug_putstr("Performing relocations... ");
 
 	/*
 	 * Process relocations: 32 bit relocations first then 64 bit after.
@@ -331,7 +343,8 @@ static void handle_relocations(void *output, unsigned long output_len)
 #endif
 }
 #else
-static inline void handle_relocations(void *output, unsigned long output_len)
+static inline void handle_relocations(void *output, unsigned long output_len,
+				      void *virt_offset)
 { }
 #endif
 
@@ -392,6 +405,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 {
 	const unsigned long run_size = VO__end - VO__text;
 	unsigned char *output_orig = output;
+	unsigned char *virt_offset;
 
 	real_mode = rmode;
 
@@ -429,9 +443,10 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	 * the entire decompressed kernel plus relocation table, or the
 	 * entire decompressed kernel plus .bss and .brk sections.
 	 */
-	output = choose_kernel_location(input_data, input_len, output,
+	choose_kernel_location(input_data, input_len, &output,
 					output_len > run_size ? output_len
-							      : run_size);
+							      : run_size,
+					&virt_offset);
 
 	/* Validate memory location choices. */
 	if ((unsigned long)output & (MIN_KERNEL_ALIGN - 1))
@@ -452,12 +467,7 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 	__decompress(input_data, input_len, NULL, NULL, output, output_len,
 			NULL, error);
 	parse_elf(output);
-	/*
-	 * 32-bit always performs relocations. 64-bit relocations are only
-	 * needed if kASLR has chosen a different load address.
-	 */
-	if (!IS_ENABLED(CONFIG_X86_64) || output != output_orig)
-		handle_relocations(output, output_len);
+	handle_relocations(output, output_len, virt_offset);
 	debug_putstr("done.\nBooting the kernel.\n");
 	return output;
 }
