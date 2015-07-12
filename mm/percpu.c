@@ -2265,6 +2265,12 @@ void __init percpu_init_late(void)
 	unsigned long flags;
 	int i;
 
+	/*pcpu_first_chunk could be the same as pcpu_reserved_chunk, check it
+	 *here to avoid handling them twice.
+	 */
+	if (pcpu_first_chunk == pcpu_reserved_chunk)
+		target_chunks[1] = NULL;
+
 	for (i = 0; (chunk = target_chunks[i]); i++) {
 		int *map;
 		const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);
