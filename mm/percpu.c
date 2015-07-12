@@ -2251,6 +2251,23 @@ void __init setup_per_cpu_areas(void)
 
 #endif	/* CONFIG_SMP */
 
+static void __init percpu_install_map(struct pcpu_chunk * chunk)
+{
+	int *map;
+	unsigned long flags;
+	const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);
+
+	BUILD_BUG_ON(size > PAGE_SIZE);
+
+	map = pcpu_mem_zalloc(size);
+	BUG_ON(!map);
+
+	spin_lock_irqsave(&pcpu_lock, flags);
+	memcpy(map, chunk->map, size);
+	chunk->map = map;
+	spin_unlock_irqrestore(&pcpu_lock, flags);
+}
+
 /*
  * First and reserved chunks are initialized with temporary allocation
  * map in initdata so that they can be used before slab is online.
@@ -2259,26 +2276,10 @@ void __init setup_per_cpu_areas(void)
  */
 void __init percpu_init_late(void)
 {
-	struct pcpu_chunk *target_chunks[] =
-		{ pcpu_first_chunk, pcpu_reserved_chunk, NULL };
-	struct pcpu_chunk *chunk;
-	unsigned long flags;
-	int i;
+	percpu_install_map(pcpu_first_chunk);
 
-	for (i = 0; (chunk = target_chunks[i]); i++) {
-		int *map;
-		const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);
-
-		BUILD_BUG_ON(size > PAGE_SIZE);
-
-		map = pcpu_mem_zalloc(size);
-		BUG_ON(!map);
-
-		spin_lock_irqsave(&pcpu_lock, flags);
-		memcpy(map, chunk->map, size);
-		chunk->map = map;
-		spin_unlock_irqrestore(&pcpu_lock, flags);
-	}
+	if (pcpu_first_chunk != pcpu_reserved_chunk)
+		percpu_install_map(pcpu_reserved_chunk);
 }
 
 /*
