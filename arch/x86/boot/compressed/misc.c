@@ -83,13 +83,10 @@
  * To avoid problems with the compressed data's meta information an extra 18
  * bytes are needed.  Leading to the formula:
  *
- * extra_bytes = (uncompressed_size >> 12) + 32768 + 18 + decompressor_size.
+ * extra_bytes = (uncompressed_size >> 12) + 32768 + 18.
  *
  * Adding 8 bytes per 32K is a bit excessive but much easier to calculate.
  * Adding 32768 instead of 32767 just makes for round numbers.
- * Adding the decompressor_size is necessary as it musht live after all
- * of the data as well.  Last I measured the decompressor is about 14K.
- * 10K of actual data and 4K of bss.
  *
  */
 
