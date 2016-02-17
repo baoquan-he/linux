@@ -393,9 +393,9 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 				  unsigned char *input_data,
 				  unsigned long input_len,
 				  unsigned char *output,
-				  unsigned long output_len,
-				  unsigned long run_size)
+				  unsigned long output_len)
 {
+	const unsigned long run_size = VO__end - VO__text;
 	unsigned char *output_orig = output;
 
 	real_mode = rmode;
@@ -415,8 +415,6 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 
 	lines = real_mode->screen_info.orig_video_lines;
 	cols = real_mode->screen_info.orig_video_cols;
-
-	run_size = VO__end - VO__text;
 
 	console_init();
 	debug_putstr("early console in decompress_kernel\n");
