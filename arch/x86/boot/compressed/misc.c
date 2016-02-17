@@ -11,6 +11,7 @@
 
 #include "misc.h"
 #include "../string.h"
+#include "../voffset.h"
 
 /* WARNING!!
  * This code is compiled with -fPIC and it is relocated dynamically
@@ -414,6 +415,8 @@ asmlinkage __visible void *decompress_kernel(void *rmode, memptr heap,
 
 	lines = real_mode->screen_info.orig_video_lines;
 	cols = real_mode->screen_info.orig_video_cols;
+
+	run_size = VO__end - VO__text;
 
 	console_init();
 	debug_putstr("early console in decompress_kernel\n");
