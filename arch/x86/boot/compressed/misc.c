@@ -19,11 +19,13 @@
  */
 
 /*
- * Getting to provable safe in place decompression is hard.
- * Worst case behaviours need to be analyzed.
- * Background information:
+ * Getting to provable safe in place decompression is hard. Worst case
+ * behaviours need be analyzed. Here let's take decompressing gzip-compressed
+ * kernel as example to illustrate it.
  *
- * The file layout is:
+ * The file layout of gzip compressed kernel is as follows. For more information,
+ * please refer to rfc 1951 and rfc 1952.
+ *
  *    magic[2]
  *    method[1]
  *    flags[1]
@@ -70,13 +72,13 @@
  * of 5 bytes per 32767 bytes.
  *
  * The worst case internal to a compressed block is very hard to figure.
- * The worst case can at least be boundined by having one bit that represents
+ * The worst case can at least be bounded by having one bit that represents
  * 32764 bytes and then all of the rest of the bytes representing the very
  * very last byte.
  *
  * All of which is enough to compute an amount of extra data that is required
  * to be safe.  To avoid problems at the block level allocating 5 extra bytes
- * per 32767 bytes of data is sufficient.  To avoind problems internal to a
+ * per 32767 bytes of data is sufficient.  To avoid problems internal to a
  * block adding an extra 32767 bytes (the worst case uncompressed block size)
  * is sufficient, to ensure that in the worst case the decompressed data for
  * block will stop the byte before the compressed data for a block begins.
@@ -88,11 +90,17 @@
  * Adding 8 bytes per 32K is a bit excessive but much easier to calculate.
  * Adding 32768 instead of 32767 just makes for round numbers.
  *
+ * Above analysis is for decompressing gzip compressed kernel only. Up to
+ * now 6 different decompressor are supported all together. And among them
+ * xz stores data in chunks and has maximum chunk of 64K. Hence safety
+ * margin should be updated to cover all decompressors so that we don't
+ * need to deal with each of them separately. Please check
+ * the description in lib/decompressor_xxx.c for specific information.
+ *
+ * extra_bytes = (uncompressed_size >> 12) + 65536 + 128.
+ *
  */
 
-/*
- * gzip declarations
- */
 #define STATIC		static
 
 #undef memcpy
