@@ -48,9 +48,8 @@
  * kernel page table mapping, reducing the size of the modules area.
  */
 #define KERNEL_IMAGE_SIZE_DEFAULT      (512 * 1024 * 1024)
-#if defined(CONFIG_RANDOMIZE_BASE) && \
-	CONFIG_RANDOMIZE_BASE_MAX_OFFSET > KERNEL_IMAGE_SIZE_DEFAULT
-#define KERNEL_IMAGE_SIZE   CONFIG_RANDOMIZE_BASE_MAX_OFFSET
+#if defined(CONFIG_RANDOMIZE_BASE)
+#define KERNEL_IMAGE_SIZE   (1024 * 1024 * 1024)
 #else
 #define KERNEL_IMAGE_SIZE      KERNEL_IMAGE_SIZE_DEFAULT
 #endif

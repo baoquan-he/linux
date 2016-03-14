@@ -428,11 +428,10 @@ static unsigned long find_random_virt_offset(unsigned long minimum,
 	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
 
 	if (image_size <= CONFIG_PHYSICAL_ALIGN)
-		slot_num = (CONFIG_RANDOMIZE_BASE_MAX_OFFSET - minimum) /
+		slot_num = (KERNEL_IMAGE_SIZE - minimum) /
 				CONFIG_PHYSICAL_ALIGN;
 	else
-		slot_num = (CONFIG_RANDOMIZE_BASE_MAX_OFFSET -
-				minimum - image_size) /
+		slot_num = (KERNEL_IMAGE_SIZE - minimum - image_size) /
 				CONFIG_PHYSICAL_ALIGN + 1;
 
 	random = get_random_long() % slot_num;
@@ -487,7 +486,7 @@ void choose_kernel_location(unsigned char *input,
 
 	/*
 	 * Get a random address between LOAD_PHYSICAL_ADDR and
-	 * CONFIG_RANDOMIZE_BASE_MAX_OFFSET
+	 * KERNEL_IMAGE_SIZE
 	 */
 	random = find_random_virt_offset(LOAD_PHYSICAL_ADDR, output_size);
 	*virt_offset = (unsigned char *)random;
