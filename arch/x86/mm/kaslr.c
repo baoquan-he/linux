@@ -29,6 +29,7 @@
 #include <asm/pgtable.h>
 #include <asm/setup.h>
 #include <asm/kaslr.h>
+#include <asm/uv/uv.h>
 
 #include "mm_internal.h"
 
@@ -113,15 +114,51 @@ static inline bool kaslr_memory_enabled(void)
 	return kaslr_enabled() && !IS_ENABLED(CONFIG_KASAN);
 }
 
+/*
+ * Even though a huge virtual address space is reserved for the direct
+ * mapping of physical memory, e.g in 4-level pageing mode, it's 64TB,
+ * rare system can own enough physical memory to use it up, most are
+ * even less than 1TB. So with KASLR enabled, we adapt the size of
+ * direct mapping area to size of actual physical memory plus the
+ * configured padding CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING.
+ * The left part will be taken out to join memory randomization.
+ *
+ * Note that UV system is an exception, its MMIOH region need be mapped
+ * into the direct mapping area too, while the size can't be got until
+ * rest_init() calling. Hence for UV system, do not adapt the size
+ * of direct mapping area.
+ */
+static inline unsigned long calc_direct_mapping_size(void)
+{
+	unsigned long size_tb, memory_tb;
+
+	/*
+	 * Update Physical memory mapping to available and
+	 * add padding if needed (especially for memory hotplug support).
+	 */
+	memory_tb = DIV_ROUND_UP(max_pfn << PAGE_SHIFT, 1UL << TB_SHIFT) +
+		CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
+
+	size_tb = 1 << (MAX_PHYSMEM_BITS - TB_SHIFT);
+
+	/*
+	 * Adapt phyiscal memory region size based on available memory if
+	 * it's not UV system.
+	 */
+	if (memory_tb < size_tb && !is_early_uv_system())
+		size_tb = memory_tb;
+
+	return size_tb;
+}
+
 /* Initialize base and padding for each memory region randomized with KASLR */
 void __init kernel_randomize_memory(void)
 {
-	size_t i;
-	unsigned long vaddr_start, vaddr;
-	unsigned long rand, memory_tb;
-	struct rnd_state rand_state;
+	unsigned long vaddr_start, vaddr, rand;
 	unsigned long remain_entropy;
 	unsigned long vmemmap_size;
+	struct rnd_state rand_state;
+	size_t i;
 
 	vaddr_start = pgtable_l5_enabled() ? __PAGE_OFFSET_BASE_L5 : __PAGE_OFFSET_BASE_L4;
 	vaddr = vaddr_start;
@@ -138,20 +175,10 @@ void __init kernel_randomize_memory(void)
 	if (!kaslr_memory_enabled())
 		return;
 
-	kaslr_regions[0].size_tb = 1 << (MAX_PHYSMEM_BITS - TB_SHIFT);
+	kaslr_regions[0].size_tb = calc_direct_mapping_size();
 	kaslr_regions[1].size_tb = VMALLOC_SIZE_TB;
 
-	/*
-	 * Update Physical memory mapping to available and
-	 * add padding if needed (especially for memory hotplug support).
-	 */
 	BUG_ON(kaslr_regions[0].base != &page_offset_base);
-	memory_tb = DIV_ROUND_UP(max_pfn << PAGE_SHIFT, 1UL << TB_SHIFT) +
-		CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
-
-	/* Adapt phyiscal memory region size based on available memory */
-	if (memory_tb < kaslr_regions[0].size_tb)
-		kaslr_regions[0].size_tb = memory_tb;
 
 	/*
 	 * Calculate how many TB vmemmap region needs, and align to
