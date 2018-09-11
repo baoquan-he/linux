@@ -104,12 +104,6 @@ static __initdata struct kaslr_memory_region {
 	{ &vmemmap_base, 1 },
 };
 
-/* Get size in bytes used by the memory region */
-static inline unsigned long get_padding(struct kaslr_memory_region *region)
-{
-	return (region->size_tb << TB_SHIFT);
-}
-
 /*
  * Apply no randomization if KASLR was disabled at boot or if KASAN
  * is enabled. KASAN shadow mappings rely on regions being PGD aligned.
@@ -161,7 +155,7 @@ void __init kernel_randomize_memory(void)
 	/* Calculate entropy available between regions */
 	remain_entropy = vaddr_end - vaddr_start;
 	for (i = 0; i < ARRAY_SIZE(kaslr_regions); i++)
-		remain_entropy -= get_padding(&kaslr_regions[i]);
+		remain_entropy -= kaslr_regions[i].size_tb << TB_SHIFT;
 
 	prandom_seed_state(&rand_state, kaslr_get_random_long("Memory"));
 
@@ -185,7 +179,7 @@ void __init kernel_randomize_memory(void)
 		 * Jump the region and add a minimum padding based on
 		 * randomization alignment.
 		 */
-		vaddr += get_padding(&kaslr_regions[i]);
+		vaddr += kaslr_regions[i].size_tb << TB_SHIFT;
 		if (pgtable_l5_enabled())
 			vaddr = round_up(vaddr + 1, P4D_SIZE);
 		else
