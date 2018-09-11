@@ -42,10 +42,59 @@
 static const unsigned long vaddr_end = CPU_ENTRY_AREA_BASE;
 
 /*
- * Memory regions randomized by KASLR (except modules that use a separate logic
- * earlier during boot). The list is ordered based on virtual addresses. This
- * order is kept after randomization.
+ * 'struct kasl_memory_region' entries represent continuous chunks of
+ * kernel virtual memory regions, to be randomized by KASLR.
+ *
+ * ( The exception is the module space virtual memory window which
+ *   uses separate logic earlier during bootup. )
+ *
+ * Currently there are three such regions: the physical memory mapping,
+ * vmalloc and vmemmap regions.
+ *
+ * The array below has the entries ordered based on virtual addresses.
+ * The order is kept after randomization, i.e. the randomized
+ * virtual addresses of these regions are still ascending.
+ *
+ * Here are the fields:
+ *
+ * @base: points to a global variable used by the MM to get the
+ * virtual base address of any of the above regions. This allows the
+ * early KASLR code to modify these base addresses early during bootup,
+ * on a per bootup basis, without the MM code even being aware of whether
+ * it got changed and to what value.
+ *
+ * When KASLR is active then the MM code makes sure that for each region
+ * there's such a single, dynamic, global base address 'unsigned long'
+ * variable available for the KASLR code to point to and modify directly:
+ *
+ * 	 { &page_offset_base, 0 },
+ *       { &vmalloc_base,     0 },
+ *       { &vmemmap_base,     1 },
+ *
+ * @size_tb: size in TB of each memory region. Thereinto, the size of
+ * the physical memory mapping region is variable, calculated according
+ * to the actual size of system RAM in order to save more space for
+ * randomization. The rest are fixed values related to paging mode.
+ *
+ * @size_tb: is the size of each memory region after randomization, and
+ * its unit is TB.
+ *
+ * Physical memory mapping: (actual RAM size + 10 TB padding)
+ * Vmalloc: 32 TB
+ * Vmemmap: 1 TB
+ *
+ * When randomize the layout, their order are kept, still the physical
+ * memory mapping region is handled fistly, next vmalloc and vmemmap.
+ * E.g the physical memory region, we limit the starting address to be
+ * taken from the 1st 1/3 part of the whole available virtual address
+ * space which is from 0xffff880000000000 to 0xfffffe0000000000, namely
+ * the original starting address of the physical memory mapping region
+ * to the starting address of cpu_entry_area mapping region. Once a random
+ * address is chosen for the physical memory mapping, we jump over the
+ * region and add 1G to begin the next region handling with the remaining
+ * available space.
  */
+
 static __initdata struct kaslr_memory_region {
 	unsigned long *base;
 	unsigned long size_tb;
