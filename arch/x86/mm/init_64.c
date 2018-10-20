@@ -467,25 +467,26 @@ phys_pte_init(pte_t *pte_page, unsigned long paddr, unsigned long paddr_end,
  * It returns the last physical address mapped.
  */
 static unsigned long __meminit
-phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
+phys_pmd_init(pmd_t *pmd_page, unsigned long vaddr_start, unsigned long vaddr_end,
 	      unsigned long page_size_mask, pgprot_t prot)
 {
-	unsigned long pages = 0, paddr_next;
-	unsigned long paddr_last = paddr_end;
+	unsigned long pages = 0, vaddr_next;
+	unsigned long paddr_last = __pa(vaddr_end);
+	unsigned long vaddr = vaddr_start;
 
-	int i = pmd_index(paddr);
+	int i = pmd_index(vaddr);
 
-	for (; i < PTRS_PER_PMD; i++, paddr = paddr_next) {
-		pmd_t *pmd = pmd_page + pmd_index(paddr);
+	for (; i < PTRS_PER_PMD; i++, vaddr = vaddr_next) {
+		pmd_t *pmd = pmd_page + pmd_index(vaddr);
 		pte_t *pte;
 		pgprot_t new_prot = prot;
 
-		paddr_next = (paddr & PMD_MASK) + PMD_SIZE;
-		if (paddr >= paddr_end) {
+		vaddr_next = (vaddr & PMD_MASK) + PMD_SIZE;
+		if (vaddr >= vaddr_end) {
 			if (!after_bootmem &&
-			    !e820__mapped_any(paddr & PMD_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & PMD_MASK), __pa(vaddr_next),
 					     E820_TYPE_RAM) &&
-			    !e820__mapped_any(paddr & PMD_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & PMD_MASK), __pa(vaddr_next),
 					     E820_TYPE_RESERVED_KERN))
 				set_pmd_safe(pmd, __pmd(0));
 			continue;
@@ -495,8 +496,8 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 			if (!pmd_large(*pmd)) {
 				spin_lock(&init_mm.page_table_lock);
 				pte = (pte_t *)pmd_page_vaddr(*pmd);
-				paddr_last = phys_pte_init(pte, paddr,
-							   paddr_end, prot);
+				paddr_last = phys_pte_init(pte, __pa(vaddr),
+							   __pa(vaddr_end), prot);
 				spin_unlock(&init_mm.page_table_lock);
 				continue;
 			}
@@ -515,7 +516,7 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 			if (page_size_mask & (1 << PG_LEVEL_2M)) {
 				if (!after_bootmem)
 					pages++;
-				paddr_last = paddr_next;
+				paddr_last = __pa(vaddr_next);
 				continue;
 			}
 			new_prot = pte_pgprot(pte_clrhuge(*(pte_t *)pmd));
@@ -525,15 +526,15 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 			pages++;
 			spin_lock(&init_mm.page_table_lock);
 			set_pte_safe((pte_t *)pmd,
-				pfn_pte((paddr & PMD_MASK) >> PAGE_SHIFT,
+				pfn_pte(__pa(vaddr & PMD_MASK) >> PAGE_SHIFT,
 					__pgprot(pgprot_val(prot) | _PAGE_PSE)));
 			spin_unlock(&init_mm.page_table_lock);
-			paddr_last = paddr_next;
+			paddr_last = __pa(vaddr_next);
 			continue;
 		}
 
 		pte = alloc_low_page();
-		paddr_last = phys_pte_init(pte, paddr, paddr_end, new_prot);
+		paddr_last = phys_pte_init(pte, __pa(vaddr), __pa(vaddr_end), new_prot);
 
 		spin_lock(&init_mm.page_table_lock);
 		pmd_populate_kernel_safe(&init_mm, pmd, pte);
@@ -550,28 +551,28 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
  * It returns the last physical address mapped.
  */
 static unsigned long __meminit
-phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
+phys_pud_init(pud_t *pud_page, unsigned long vaddr_start, unsigned long vaddr_end,
 	      unsigned long page_size_mask)
 {
-	unsigned long pages = 0, paddr_next;
-	unsigned long paddr_last = paddr_end;
-	unsigned long vaddr = (unsigned long)__va(paddr);
+	unsigned long pages = 0, vaddr_next;
+	unsigned long paddr_last = __pa(vaddr_end);
+	unsigned long vaddr = vaddr_start;
 	int i = pud_index(vaddr);
 
-	for (; i < PTRS_PER_PUD; i++, paddr = paddr_next) {
+	for (; i < PTRS_PER_PUD; i++, vaddr = vaddr_next) {
 		pud_t *pud;
 		pmd_t *pmd;
 		pgprot_t prot = PAGE_KERNEL;
 
-		vaddr = (unsigned long)__va(paddr);
+		//vaddr = (unsigned long)__va(paddr);
 		pud = pud_page + pud_index(vaddr);
-		paddr_next = (paddr & PUD_MASK) + PUD_SIZE;
+		vaddr_next = (vaddr & PUD_MASK) + PUD_SIZE;
 
-		if (paddr >= paddr_end) {
+		if (vaddr >= vaddr_end) {
 			if (!after_bootmem &&
-			    !e820__mapped_any(paddr & PUD_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & PUD_MASK), __pa(vaddr_next),
 					     E820_TYPE_RAM) &&
-			    !e820__mapped_any(paddr & PUD_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & PUD_MASK), __pa(vaddr_next),
 					     E820_TYPE_RESERVED_KERN))
 				set_pud_safe(pud, __pud(0));
 			continue;
@@ -580,8 +581,8 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 		if (!pud_none(*pud)) {
 			if (!pud_large(*pud)) {
 				pmd = pmd_offset(pud, 0);
-				paddr_last = phys_pmd_init(pmd, paddr,
-							   paddr_end,
+				paddr_last = phys_pmd_init(pmd, vaddr,
+							   vaddr_end,
 							   page_size_mask,
 							   prot);
 				continue;
@@ -601,7 +602,7 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 			if (page_size_mask & (1 << PG_LEVEL_1G)) {
 				if (!after_bootmem)
 					pages++;
-				paddr_last = paddr_next;
+				paddr_last = __pa(vaddr_next);
 				continue;
 			}
 			prot = pte_pgprot(pte_clrhuge(*(pte_t *)pud));
@@ -611,15 +612,15 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 			pages++;
 			spin_lock(&init_mm.page_table_lock);
 			set_pte_safe((pte_t *)pud,
-				pfn_pte((paddr & PUD_MASK) >> PAGE_SHIFT,
+				pfn_pte(__pa(vaddr & PUD_MASK) >> PAGE_SHIFT,
 					PAGE_KERNEL_LARGE));
 			spin_unlock(&init_mm.page_table_lock);
-			paddr_last = paddr_next;
+			paddr_last = __pa(vaddr_next);
 			continue;
 		}
 
 		pmd = alloc_low_page();
-		paddr_last = phys_pmd_init(pmd, paddr, paddr_end,
+		paddr_last = phys_pmd_init(pmd, vaddr, vaddr_end,
 					   page_size_mask, prot);
 
 		spin_lock(&init_mm.page_table_lock);
@@ -633,29 +634,28 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 }
 
 static unsigned long __meminit
-phys_p4d_init(p4d_t *p4d_page, unsigned long paddr, unsigned long paddr_end,
+phys_p4d_init(p4d_t *p4d_page, unsigned long vaddr_start, unsigned long vaddr_end,
 	      unsigned long page_size_mask)
 {
-	unsigned long paddr_next, paddr_last = paddr_end;
-	unsigned long vaddr = (unsigned long)__va(paddr);
+	unsigned long vaddr_next, paddr_last = __pa(vaddr_end);
+	unsigned long vaddr = vaddr_start;
 	int i = p4d_index(vaddr);
 
 	if (!pgtable_l5_enabled())
-		return phys_pud_init((pud_t *) p4d_page, paddr, paddr_end, page_size_mask);
+		return phys_pud_init((pud_t *) p4d_page, vaddr, vaddr_end, page_size_mask);
 
-	for (; i < PTRS_PER_P4D; i++, paddr = paddr_next) {
+	for (; i < PTRS_PER_P4D; i++, vaddr = vaddr_next) {
 		p4d_t *p4d;
 		pud_t *pud;
 
-		vaddr = (unsigned long)__va(paddr);
 		p4d = p4d_page + p4d_index(vaddr);
-		paddr_next = (paddr & P4D_MASK) + P4D_SIZE;
+		vaddr_next = (vaddr & P4D_MASK) + P4D_SIZE;
 
-		if (paddr >= paddr_end) {
+		if (vaddr >= vaddr_end) {
 			if (!after_bootmem &&
-			    !e820__mapped_any(paddr & P4D_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & P4D_MASK), __pa(vaddr_next),
 					     E820_TYPE_RAM) &&
-			    !e820__mapped_any(paddr & P4D_MASK, paddr_next,
+			    !e820__mapped_any(__pa(vaddr & P4D_MASK), __pa(vaddr_next),
 					     E820_TYPE_RESERVED_KERN))
 				set_p4d_safe(p4d, __p4d(0));
 			continue;
@@ -663,14 +663,14 @@ phys_p4d_init(p4d_t *p4d_page, unsigned long paddr, unsigned long paddr_end,
 
 		if (!p4d_none(*p4d)) {
 			pud = pud_offset(p4d, 0);
-			paddr_last = phys_pud_init(pud, paddr,
-					paddr_end,
+			paddr_last = phys_pud_init(pud, vaddr,
+					vaddr_end,
 					page_size_mask);
 			continue;
 		}
 
 		pud = alloc_low_page();
-		paddr_last = phys_pud_init(pud, paddr, paddr_end,
+		paddr_last = phys_pud_init(pud, vaddr, vaddr_end,
 					   page_size_mask);
 
 		spin_lock(&init_mm.page_table_lock);
@@ -687,17 +687,13 @@ phys_p4d_init(p4d_t *p4d_page, unsigned long paddr, unsigned long paddr_end,
  * down. It returns the last physical address mapped.
  */
 unsigned long __meminit
-kernel_physical_mapping_init(unsigned long paddr_start,
-			     unsigned long paddr_end,
+kernel_physical_mapping_init(unsigned long vaddr_start,
+			     unsigned long vaddr_end,
 			     unsigned long page_size_mask)
 {
 	bool pgd_changed = false;
-	unsigned long vaddr, vaddr_start, vaddr_end, vaddr_next, paddr_last;
-
-	paddr_last = paddr_end;
-	vaddr = (unsigned long)__va(paddr_start);
-	vaddr_end = (unsigned long)__va(paddr_end);
-	vaddr_start = vaddr;
+	unsigned long vaddr_next, vaddr = vaddr_start;
+	unsigned long paddr_last = __pa(vaddr_end);
 
 	for (; vaddr < vaddr_end; vaddr = vaddr_next) {
 		pgd_t *pgd = pgd_offset_k(vaddr);
@@ -707,14 +703,14 @@ kernel_physical_mapping_init(unsigned long paddr_start,
 
 		if (pgd_val(*pgd)) {
 			p4d = (p4d_t *)pgd_page_vaddr(*pgd);
-			paddr_last = phys_p4d_init(p4d, __pa(vaddr),
-						   __pa(vaddr_end),
+			paddr_last = phys_p4d_init(p4d, vaddr,
+						   vaddr_end,
 						   page_size_mask);
 			continue;
 		}
 
 		p4d = alloc_low_page();
-		paddr_last = phys_p4d_init(p4d, __pa(vaddr), __pa(vaddr_end),
+		paddr_last = phys_p4d_init(p4d, vaddr, vaddr_end,
 					   page_size_mask);
 
 		spin_lock(&init_mm.page_table_lock);

@@ -291,7 +291,7 @@ static void __ref adjust_range_page_size_mask(struct map_range *mr,
 				continue;
 #endif
 
-			if (memblock_is_region_memory(start, end - start))
+			if (memblock_is_region_memory(__pa(start), end - start))
 				mr[i].page_size_mask |= 1<<PG_LEVEL_2M;
 		}
 		if ((page_size_mask & (1<<PG_LEVEL_1G)) &&
@@ -299,7 +299,7 @@ static void __ref adjust_range_page_size_mask(struct map_range *mr,
 			unsigned long start = round_down(mr[i].start, PUD_SIZE);
 			unsigned long end = round_up(mr[i].end, PUD_SIZE);
 
-			if (memblock_is_region_memory(start, end - start))
+			if (memblock_is_region_memory(__pa(start), end - start))
 				mr[i].page_size_mask |= 1<<PG_LEVEL_1G;
 		}
 	}
@@ -424,7 +424,7 @@ static int __meminit split_mem_range(struct map_range *mr, int nr_range,
 
 	for (i = 0; i < nr_range; i++)
 		pr_debug(" [mem %#010lx-%#010lx] page %s\n",
-				mr[i].start, mr[i].end - 1,
+				__pa(mr[i].start), __pa(mr[i].end - 1),
 				page_size_string(&mr[i]));
 
 	return nr_range;
@@ -474,7 +474,7 @@ unsigned long __ref init_memory_mapping(unsigned long start,
 	       start, end - 1);
 
 	memset(mr, 0, sizeof(mr));
-	nr_range = split_mem_range(mr, 0, start, end);
+	nr_range = split_mem_range(mr, 0, __va(start), __va(end));
 
 	for (i = 0; i < nr_range; i++)
 		ret = kernel_physical_mapping_init(mr[i].start, mr[i].end,
