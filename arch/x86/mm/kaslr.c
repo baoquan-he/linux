@@ -147,27 +147,29 @@ void __init kernel_randomize_memory(void)
 
 static void __meminit init_trampoline_pud(void)
 {
-	unsigned long paddr, paddr_next;
+	unsigned long paddr, vaddr;
 	pgd_t *pgd;
-	pud_t *pud_page, *pud_page_tramp;
-	int i;
+	pud_t *pud_page, *pud_page_tramp, *pud, *pud_tramp;
+	pmd_t *pmd_page, *pmd_page_tramp, *pmd, *pmd_tramp;
 
 	pud_page_tramp = alloc_low_page();
+	pmd_page_tramp = alloc_low_page();
 
 	paddr = 0;
+	vaddr = (unsigned long)__va(paddr);
+
 	pgd = pgd_offset_k((unsigned long)__va(paddr));
 	pud_page = (pud_t *) pgd_page_vaddr(*pgd);
+	pud = pud_page + pud_index(vaddr);
+	pmd_page = (pmd_t *) pud_page_vaddr(*pud);
+	pmd = pmd_page + pmd_index(vaddr);
 
-	for (i = pud_index(paddr); i < PTRS_PER_PUD; i++, paddr = paddr_next) {
-		pud_t *pud, *pud_tramp;
-		unsigned long vaddr = (unsigned long)__va(paddr);
+	pud_tramp = pud_page_tramp + pud_index(paddr);
+	pmd_tramp = pmd_page_tramp + pmd_index(paddr);
 
-		pud_tramp = pud_page_tramp + pud_index(paddr);
-		pud = pud_page + pud_index(vaddr);
-		paddr_next = (paddr & PUD_MASK) + PUD_SIZE;
-
-		*pud_tramp = *pud;
-	}
+	set_pud(pud_tramp,
+		__pud(_KERNPG_TABLE | __pa(pmd_page_tramp)));
+	*pmd_tramp = *pmd;
 
 	set_pgd(&trampoline_pgd_entry,
 		__pgd(_KERNPG_TABLE | __pa(pud_page_tramp)));
@@ -175,27 +177,38 @@ static void __meminit init_trampoline_pud(void)
 
 static void __meminit init_trampoline_p4d(void)
 {
-	unsigned long paddr, paddr_next;
+	unsigned long paddr, vaddr;
 	pgd_t *pgd;
-	p4d_t *p4d_page, *p4d_page_tramp;
-	int i;
+	p4d_t *p4d_page, *p4d_page_tramp, *p4d, *p4d_tramp;
+	pud_t *pud_page, *pud_page_tramp, *pud, *pud_tramp;
+	pmd_t *pmd_page, *pmd_page_tramp, *pmd, *pmd_tramp;
 
 	p4d_page_tramp = alloc_low_page();
+	pud_page_tramp = alloc_low_page();
+	pmd_page_tramp = alloc_low_page();
 
 	paddr = 0;
+	vaddr = (unsigned long)__va(paddr);
 	pgd = pgd_offset_k((unsigned long)__va(paddr));
 	p4d_page = (p4d_t *) pgd_page_vaddr(*pgd);
 
-	for (i = p4d_index(paddr); i < PTRS_PER_P4D; i++, paddr = paddr_next) {
-		p4d_t *p4d, *p4d_tramp;
-		unsigned long vaddr = (unsigned long)__va(paddr);
+	p4d = p4d_page + p4d_index(vaddr);
+	p4d_tramp = p4d_page_tramp + p4d_index(paddr);
 
-		p4d_tramp = p4d_page_tramp + p4d_index(paddr);
-		p4d = p4d_page + p4d_index(vaddr);
-		paddr_next = (paddr & P4D_MASK) + P4D_SIZE;
+	pud_page = (pud_t *) p4d_page_vaddr(*p4d);
+	pud = pud_page + pud_index(vaddr);
+	pmd_page = (pmd_t *) pud_page_vaddr(*pud);
+	pmd = pmd_page + pmd_index(vaddr);
 
-		*p4d_tramp = *p4d;
-	}
+	p4d_tramp = p4d_page_tramp + p4d_index(paddr);
+	pud_tramp = pud_page_tramp + pud_index(paddr);
+	pmd_tramp = pmd_page_tramp + pmd_index(paddr);
+
+	set_p4d(p4d_tramp,
+		__p4d(_KERNPG_TABLE | __pa(pud_page_tramp)));
+	set_pud(pud_tramp,
+		__pud(_KERNPG_TABLE | __pa(pmd_page_tramp)));
+	*pmd_tramp = *pmd;
 
 	set_pgd(&trampoline_pgd_entry,
 		__pgd(_KERNPG_TABLE | __pa(p4d_page_tramp)));
