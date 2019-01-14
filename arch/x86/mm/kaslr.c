@@ -126,9 +126,9 @@ void __init kernel_randomize_memory(void)
 		entropy = remain_entropy / (ARRAY_SIZE(kaslr_regions) - i);
 		prandom_bytes_state(&rand_state, &rand, sizeof(rand));
 		if (pgtable_l5_enabled())
-			entropy = (rand % (entropy + 1)) & P4D_MASK;
+			entropy = (rand % (entropy + 1)) & PMD_MASK;
 		else
-			entropy = (rand % (entropy + 1)) & PUD_MASK;
+			entropy = (rand % (entropy + 1)) & PMD_MASK;
 		vaddr += entropy;
 		*kaslr_regions[i].base = vaddr;
 
@@ -138,9 +138,9 @@ void __init kernel_randomize_memory(void)
 		 */
 		vaddr += get_padding(&kaslr_regions[i]);
 		if (pgtable_l5_enabled())
-			vaddr = round_up(vaddr + 1, P4D_SIZE);
+			vaddr = round_up(vaddr + 1, PMD_SIZE);
 		else
-			vaddr = round_up(vaddr + 1, PUD_SIZE);
+			vaddr = round_up(vaddr + 1, PMD_SIZE);
 		remain_entropy -= entropy;
 	}
 }
